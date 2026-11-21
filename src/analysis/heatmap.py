@@ -42,7 +42,7 @@ _SIDE_MAP = {
 
 def load_map_name(data_dir: Path) -> str:
     """从 header.json 读取地图名。"""
-    header = json.loads((data_dir / "header.json").read_text(encoding="utf-8"))
+    header = json.loads((data_dir / "tables" / "header.json").read_text(encoding="utf-8"))
     return header["map_name"]
 
 
@@ -55,7 +55,7 @@ def load_points(
     role: str | None = None,
 ) -> list[tuple[float, float]]:
     """从指定表读取 (x, y) 坐标点，支持阵营/玩家过滤。"""
-    df = pl.read_parquet(data_dir / f"{table}.parquet")
+    df = pl.read_parquet(data_dir / "tables" / f"{table}.parquet")
 
     if table == "snapshots_1s":
         x_col, y_col = "x", "y"
@@ -110,7 +110,9 @@ def make_heatmap(
 
     if out is None:
         tag = "-".join(parts)
-        out = data_dir / f"heatmap_{tag}.png"
+        figures_dir = data_dir / "figures"
+        figures_dir.mkdir(parents=True, exist_ok=True)
+        out = figures_dir / f"heatmap_{tag}.png"
     fig.savefig(out, dpi=150, bbox_inches="tight", facecolor="black")
     return out
 

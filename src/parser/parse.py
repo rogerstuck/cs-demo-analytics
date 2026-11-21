@@ -37,11 +37,12 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
 
     match_id = demo_path.stem
     out = Path(out_dir) / match_id
-    out.mkdir(parents=True, exist_ok=True)
-    print(f"[2/3] 写出到：{out}")
+    tables_dir = out / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[2/3] 写出到：{tables_dir}")
 
     # 元信息
-    (out / "header.json").write_text(
+    (tables_dir / "header.json").write_text(
         json.dumps(demo.header, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
@@ -61,11 +62,11 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
 
     manifest: dict[str, dict] = {}
     for name, df in tables.items():
-        path = out / f"{name}.parquet"
+        path = tables_dir / f"{name}.parquet"
         df.write_parquet(path)
         manifest[name] = {"rows": df.shape[0], "columns": df.shape[1]}
 
-    (out / "manifest.json").write_text(
+    (tables_dir / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 

@@ -43,7 +43,7 @@ def _safe_stdout() -> None:
 
 
 def load_map_name(data_dir: Path) -> str:
-    header = json.loads((data_dir / "header.json").read_text(encoding="utf-8"))
+    header = json.loads((data_dir / "tables" / "header.json").read_text(encoding="utf-8"))
     return header["map_name"]
 
 
@@ -76,8 +76,8 @@ def pixel_to_cell(px: float, py: float, n: int) -> tuple[int, int]:
 def analyze(data_dir: Path, grid: int = 12, min_samples: int = 2) -> dict:
     """计算每个 zone 的首死数与丢分率，返回结构化结果。"""
     map_name = load_map_name(data_dir)
-    kills = pl.read_parquet(data_dir / "kills.parquet")
-    rounds = pl.read_parquet(data_dir / "rounds.parquet")
+    kills = pl.read_parquet(data_dir / "tables" / "kills.parquet")
+    rounds = pl.read_parquet(data_dir / "tables" / "rounds.parquet")
 
     k = assign_rounds(kills, rounds)
     opening = opening_kills(k)
@@ -186,8 +186,14 @@ def main() -> int:
             f"  ({rec['world_x']},{rec['world_y']})"
         )
 
+    # 输出目录
+    figures_dir = data_dir / "figures"
+    figures_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir = data_dir / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
     # 导出 CSV
-    csv_path = data_dir / "lost_zones.csv"
+    csv_path = reports_dir / "lost_zones.csv"
     pl.DataFrame(top).write_csv(csv_path)
     print(f"\n[OK] 排名表已导出：{csv_path}")
 
@@ -195,7 +201,7 @@ def main() -> int:
     # 1) 首死数（危险区）
     draw_overlay(
         res["map_name"], args.grid, res["opening_deaths"], cmap="YlOrRd",
-        title=f"{res['map_name']} 首死区域（danger zones）", out=data_dir / "lost_zones_opening.png",
+        title=f"{res['map_name']} 首死区域（danger zones）", out=figures_dir / "lost_zones_opening.png",
     )
     # 2) 丢分率（需满足最少样本）
     loss_rate = {
@@ -205,7 +211,7 @@ def main() -> int:
     }
     draw_overlay(
         res["map_name"], args.grid, loss_rate, cmap="Reds",
-        title=f"{res['map_name']} 先掉首死后丢分率（≥{args.min_samples}样本）", out=data_dir / "lost_zones_lossrate.png",
+        title=f"{res['map_name']} 先掉首死后丢分率（≥{args.min_samples}样本）", out=figures_dir / "lost_zones_lossrate.png",
     )
     return 0
 

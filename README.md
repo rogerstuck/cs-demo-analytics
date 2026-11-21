@@ -67,7 +67,11 @@ cs-demo-analytics/
 ├── docs/               # 文档（项目计划书、架构设计）
 ├── data/
 │   ├── demos/          # 原始 demo（不入库）
-│   ├── processed/      # 解析后的 Parquet
+│   ├── processed/      # 解析结果（每个 demo 一个目录）
+│   │   └── <demo名>/
+│   │       ├── tables/    # 解析出的 Parquet + header.json + manifest.json
+│   │       ├── figures/   # 热力图、失守区域图等
+│   │       └── reports/   # 分析表格（CSV）
 │   └── maps/           # 地图底图与 zone 定义
 ├── src/
 │   ├── parser/         # demo 解析
