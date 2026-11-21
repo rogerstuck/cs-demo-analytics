@@ -163,20 +163,19 @@ python -m src.analysis.heatmap --data data/processed/<demo名> --table kills --r
 
 ## demo 命名规范
 
-**个人 demo**（`data/demos/my demo/`）：`YYYY-MM-DD_MAP-NAME_序号.dem`
-
-**职业选手 demo**（`data/demos/pro's demo/`）：`<职业选手ID>_YYYY-MM-DD_MAP-NAME_序号.dem`
+统一采用：`<玩家昵称>_YYYY-MM-DD_MAP-NAME_序号.dem`
 
 | 部分 | 说明 | 示例 |
 |------|------|------|
-| `职业选手ID` | 仅职业 demo，选手昵称 | `NiKo` |
+| `玩家昵称` | 该 demo 的主角：自己的游戏昵称，或职业选手昵称 | `Sonkyo` / `NiKo` |
 | `YYYY-MM-DD` | 比赛日期 | `2026-11-16` |
 | `MAP-NAME` | 地图名（与 demo 内 `map_name` 一致） | `de_dust2` |
 | `序号` | 同一天同一地图的多个 demo，按下载顺序 1、2、3… 递增 | `1` |
 
 - 各部分用下划线 `_` 分隔
-- 示例：个人 `2026-11-16_de_dust2_1.dem`；职业 `NiKo_2026-11-16_de_dust2_1.dem`
-- 解析后产物目录名 = 去掉 `.dem` 的文件名，如 `data/processed/2026-11-16_de_dust2_1/`
+- 示例：自己 `Sonkyo_2026-11-16_de_dust2_1.dem`；职业 `NiKo_2026-11-16_de_dust2_1.dem`
+- 解析后产物目录名 = 去掉 `.dem` 的文件名，如 `data/processed/Sonkyo_2026-11-16_de_dust2_1/`
+- 昵称前缀同时用于区分“自己的 demo”和“职业选手 demo”，后续分析可按选手聚合
 
 ---
 
