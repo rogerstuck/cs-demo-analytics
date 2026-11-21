@@ -110,11 +110,21 @@ python -m pip install -r requirements.txt
 ### 解析第一个 demo
 
 ```bash
-# 下载一个 demo 到 data/demos/ 后：
-python -m src.parser.parse --demo data/demos/your_demo.dem --out data/processed/
+conda activate cs-analytics
+python -m src.parser.parse "data/demos/my demo/xxx.dem" -o data/processed
 ```
 
-> 解析脚本见阶段 0 任务（当前待实现，API 已确认）。
+解析后会在 `data/processed/<demo名>/` 下生成 12 张 Parquet 表（见 `docs/数据字典.md`）。
+
+### 生成热力图（阶段 1）
+
+```bash
+python -m src.analysis.heatmap --data data/processed/<demo名>            # 全员走位
+python -m src.analysis.heatmap --data data/processed/<demo名> --side CT  # 只看 CT
+python -m src.analysis.heatmap --data data/processed/<demo名> --side T   # 只看 T
+python -m src.analysis.heatmap --data data/processed/<demo名> --player 昵称  # 只看某玩家
+python -m src.analysis.heatmap --data data/processed/<demo名> --table kills --role victim  # 死亡热区
+```
 
 ---
 
