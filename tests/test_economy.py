@@ -51,7 +51,7 @@ def test_full_by_absolute_standard():
 def test_round2_after_pistol_win_is_full_not_force():
     """赢下手枪局第二回合：人均 3500 已是经济上限（对手只有手枪）→ 全买，不是强起。
 
-    对应 Sonkyo_2026-11-16_de_dust2_1 第 2 回合 CT：eq_p=3500，对手 1370。
+    对应 2026-11-16_de_dust2_1 第 2 回合 CT：eq_p=3500，对手 1370。
     """
     assert _cls(spend_p=2250, eq_p=3500, n_rifle=2, eq_opp=1370) == "full"
 
