@@ -10,9 +10,9 @@ import polars as pl
 
 from src.parser.parse import (
     EXTRA_WEAPON_NAMES,
-    add_weapon_clean,
     canonical_weapon_names,
     normalize_weapon,
+    normalize_weapon_column,
 )
 
 KNOWN = {
@@ -79,24 +79,20 @@ def test_canonical_names_from_snapshots():
     assert {"world", "hegrenade", "knife"} <= known
 
 
-def test_add_weapon_clean_column():
-    """add_weapon_clean 追加 weapon_clean 列，原列保持不变。"""
+def test_normalize_weapon_column_overwrites_weapon():
+    """normalize_weapon_column 直接把 weapon 列改写成规范名（不新增列）。"""
     df = pl.DataFrame(
         {
             "tick": [1, 2, 3],
             "weapon": ["ak47", "5e_2023pass1_m4a1_silencer", "weapon_awp"],
         }
     )
-    out = add_weapon_clean(df, KNOWN)
-    assert out["weapon"].to_list() == [
-        "ak47",
-        "5e_2023pass1_m4a1_silencer",
-        "weapon_awp",
-    ]
-    assert out["weapon_clean"].to_list() == ["ak47", "m4a1_silencer", "awp"]
+    out = normalize_weapon_column(df, KNOWN)
+    assert out.columns == ["tick", "weapon"]  # 没有多出来的列
+    assert out["weapon"].to_list() == ["ak47", "m4a1_silencer", "awp"]
 
 
-def test_add_weapon_clean_skips_tables_without_weapon():
+def test_normalize_weapon_column_skips_tables_without_weapon():
     df = pl.DataFrame({"tick": [1, 2]})
-    out = add_weapon_clean(df, KNOWN)
+    out = normalize_weapon_column(df, KNOWN)
     assert out.columns == ["tick"]

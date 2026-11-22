@@ -97,12 +97,16 @@ def normalize_weapon(raw: str | None, known: set[str]) -> str | None:
     return s
 
 
-def add_weapon_clean(df: pl.DataFrame, known: set[str]) -> pl.DataFrame:
-    """给表添加 ``weapon_clean`` 列（与 ``weapon`` 并列，原列不动）。"""
+def normalize_weapon_column(df: pl.DataFrame, known: set[str]) -> pl.DataFrame:
+    """把表中的 ``weapon`` 列**就地**改写成规范类名。
+
+    ``5e_2023pass1_ak47`` → ``ak47``；``weapon_ak47`` → ``ak47``。
+    无法匹配的字符串保留（仅去 ``weapon_`` 前缀 + 小写）。
+    """
     if "weapon" not in df.columns:
         return df
     cleaned = [normalize_weapon(w, known) for w in df["weapon"].to_list()]
-    return df.with_columns(pl.Series("weapon_clean", cleaned, dtype=pl.String))
+    return df.with_columns(pl.Series("weapon", cleaned, dtype=pl.String))
 
 
 def _safe_stdout() -> None:
@@ -185,9 +189,9 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
         "players": players,
         "stats": demo.stats,
         "rounds": demo.rounds,
-        "kills": add_weapon_clean(demo.kills, known_weapons),
-        "damages": add_weapon_clean(demo.damages, known_weapons),
-        "shots": add_weapon_clean(demo.shots, known_weapons),
+        "kills": normalize_weapon_column(demo.kills, known_weapons),
+        "damages": normalize_weapon_column(demo.damages, known_weapons),
+        "shots": normalize_weapon_column(demo.shots, known_weapons),
         "grenades": demo.grenades,
         "bomb": demo.bomb,
         "item_events": demo.item_events,
