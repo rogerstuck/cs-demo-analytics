@@ -92,8 +92,16 @@ def classify(
     return "force"
 
 
-def eco_kind(*, spend_p: float, n_rifle: int, rules: dict[str, float] | None = None) -> str | None:
-    """eco 局再细分：纯手枪省钱（eco_pure）还是带着枪省钱（eco_gear）。"""
+def eco_kind(
+    *, buy_type: str, spend_p: float, n_rifle: int, rules: dict[str, float] | None = None
+) -> str | None:
+    """eco 局再细分：纯手枪省钱（eco_pure）还是带着枪省钱（eco_gear）。
+
+    只有 ``buy_type == "eco"`` 的行才有意义；``pistol`` / ``force`` / ``full``
+    一律返回 ``None``（手枪局人均花费也是 0，不能归到 eco 的子类里）。
+    """
+    if buy_type != "eco":
+        return None
     r = {**BUY_RULES, **(rules or {})}
     if spend_p >= r["eco_spend_max"]:
         return None
@@ -174,17 +182,23 @@ def build_round_economy(data_dir: str | Path, rules: dict[str, float] | None = N
     # 分类
     labels, kinds = [], []
     for row in df.iter_rows(named=True):
-        labels.append(
-            classify(
-                is_pistol=row["is_pistol"],
+        label = classify(
+            is_pistol=row["is_pistol"],
+            spend_p=row["spend_p"],
+            eq_p=row["eq_p"],
+            n_rifle=row["n_rifle"],
+            eq_opp=row["eq_opp"],
+            rules=rules,
+        )
+        labels.append(label)
+        kinds.append(
+            eco_kind(
+                buy_type=label,
                 spend_p=row["spend_p"],
-                eq_p=row["eq_p"],
                 n_rifle=row["n_rifle"],
-                eq_opp=row["eq_opp"],
                 rules=rules,
             )
         )
-        kinds.append(eco_kind(spend_p=row["spend_p"], n_rifle=row["n_rifle"], rules=rules))
 
     df = df.with_columns(
         pl.Series("buy_type_v2", labels, dtype=pl.String),

@@ -178,6 +178,9 @@ def test_pistol_round(economy_df):
     row = _ct(economy_df, 1)
     assert row["buy_type_v2"] == "pistol"
     assert row["n_rifle"] == 0
+    # 手枪局不参与 eco 细分（虽然人均花费也是 0）
+    assert row["eco_kind"] is None
+    assert row["saved_gear"] is False
 
 
 def test_gear_save_round_is_eco_with_saved_gear_flag(economy_df):
@@ -216,7 +219,21 @@ def test_full_round(economy_df):
 
 def test_second_half_pistol_round(economy_df):
     """下半场换边后的首回合也应该是手枪局。"""
-    assert _ct(economy_df, 6)["buy_type_v2"] == "pistol"
+    row = _ct(economy_df, 6)
+    assert row["buy_type_v2"] == "pistol"
+    assert row["eco_kind"] is None
+    assert row["saved_gear"] is False
+
+
+def test_eco_kind_null_for_non_eco_rounds(economy_df):
+    """只有 eco 行才有 eco_kind，避免统计时串类。"""
+    ct = economy_df.filter(pl.col("side") == "counter-terrorist")
+    for row in ct.iter_rows(named=True):
+        if row["buy_type_v2"] == "eco":
+            assert row["eco_kind"] in ("eco_pure", "eco_gear")
+        else:
+            assert row["eco_kind"] is None, row["buy_type_v2"]
+            assert row["saved_gear"] is False
 
 
 def test_pure_eco_is_not_mistaken_for_pistol(economy_df):

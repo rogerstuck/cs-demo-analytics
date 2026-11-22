@@ -27,9 +27,20 @@ def test_eco_when_almost_no_money_spent():
 
 def test_eco_gear_distinguished_from_pure_eco():
     """保枪 eco（带长枪不花钱）与纯手枪 eco 要能分开。"""
-    assert eco_kind(spend_p=300, n_rifle=4) == "eco_gear"
-    assert eco_kind(spend_p=300, n_rifle=1) == "eco_pure"
-    assert eco_kind(spend_p=2000, n_rifle=4) is None
+    assert eco_kind(buy_type="eco", spend_p=300, n_rifle=4) == "eco_gear"
+    assert eco_kind(buy_type="eco", spend_p=300, n_rifle=1) == "eco_pure"
+    assert eco_kind(buy_type="eco", spend_p=2000, n_rifle=4) is None
+
+
+def test_eco_kind_only_applies_to_eco():
+    """eco_kind 只对 buy_type == "eco" 有意义。
+
+    手枪局人均花费同样是 0，若不加限制会被归成 eco_pure，
+    按 eco_kind 分组统计时手枪局就会混进纯 eco。
+    """
+    assert eco_kind(buy_type="pistol", spend_p=0, n_rifle=0) is None
+    assert eco_kind(buy_type="force", spend_p=3000, n_rifle=1) is None
+    assert eco_kind(buy_type="full", spend_p=2000, n_rifle=5) is None
 
 
 def test_full_by_absolute_standard():
