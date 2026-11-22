@@ -249,9 +249,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="经济局分类（eco / force / full）")
     parser.add_argument("--data", required=True, help="解析后的 demo 目录")
     parser.add_argument("--show", action="store_true", help="打印完整逐回合表格")
-    parser.add_argument(
-        "--with-bots", action="store_true", help="把 bot 计入统计（默认剔除）"
-    )
     args = parser.parse_args()
 
     data_dir = Path(args.data)
@@ -260,8 +257,6 @@ def main() -> int:
         return 1
 
     df = build_round_economy(data_dir)
-    if args.with_bots:
-        print("⚠️  已忽略 --with-bots：bot 的购买成本不可信，经济统计始终剔除 steamid=0")
 
     out_parquet = data_dir / "tables" / "round_economy_v2.parquet"
     out_csv = data_dir / "reports" / "round_economy_v2.csv"
