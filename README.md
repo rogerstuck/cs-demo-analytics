@@ -69,7 +69,7 @@ cs-demo-analytics/
 │   ├── demos/          # 原始 demo（不入库）
 │   ├── processed/      # 解析结果（每个 demo 一个目录）
 │   │   └── <demo名>/
-│   │       ├── tables/    # 解析出的 Parquet + header.json + manifest.json
+│   │       ├── tables/    # 解析出的 Parquet + header.json + manifest.json + bots.json
 │   │       ├── figures/   # 热力图、失守区域图等
 │   │       └── reports/   # 分析表格（CSV）
 │   └── maps/           # 地图底图与 zone 定义
@@ -77,7 +77,7 @@ cs-demo-analytics/
 │   ├── parser/         # demo 解析
 │   ├── storage/        # 落库与查询
 │   ├── features/       # 特征工程、zone 离散化
-│   ├── analysis/       # 热力图、聚类、失守分析
+│   ├── analysis/       # 热力图、失守分析、经济分类
 │   ├── recsys/         # 站位推荐系统
 │   ├── llm/            # LLM 报告生成
 │   └── api/            # FastAPI 服务
@@ -120,6 +120,10 @@ python -m src.parser.parse "data/demos/my demo/xxx.dem" -o data/processed
 
 解析后会在 `data/processed/<demo名>/` 下生成 12 张 Parquet 表（见 `docs/数据字典.md`）。
 
+> 解析时会自动识别并标记 **bot 与 GOTV 观战者**（`steamid == 0`），写入 `tables/bots.json`。
+> 玩家中途掉线后由 bot 接管是常有的事（本示例 demo 的 `Darryl` 就是 bot），
+> 所有分析模块默认剔除它们。
+
 ### 生成热力图（阶段 1）
 
 ```bash
@@ -129,6 +133,28 @@ python -m src.analysis.heatmap --data data/processed/<demo名> --side T   # 只�
 python -m src.analysis.heatmap --data data/processed/<demo名> --player 昵称  # 只看某玩家
 python -m src.analysis.heatmap --data data/processed/<demo名> --table kills --role victim  # 死亡热区
 ```
+
+### 失守区域分析（阶段 2）
+
+```bash
+python -m src.analysis.lost_zones --data data/processed/<demo名>
+python -m src.analysis.lost_zones --data data/processed/<demo名> --grid 12 --min-samples 2
+```
+
+输出：`figures/lost_zones_opening.png`、`figures/lost_zones_lossrate.png`、`reports/lost_zones.csv`
+
+### 经济局分类（阶段 2）
+
+```bash
+python -m src.analysis.economy --data data/processed/<demo名>
+python -m src.analysis.economy --data data/processed/<demo名> --show  # 打印逐回合明细
+```
+
+输出：`tables/round_economy_v2.parquet`、`reports/round_economy_v2.csv`
+
+分类规则（eco / force / full，手枪局单独成类）见 `docs/数据字典.md` 第 6 节。
+与 awpy 自带的 `buy_type` 相比，本项目额外考虑了 **可用资金**（人均实际花费）
+和 **对手装备强弱**，避免把“赢手枪局后第二回合买满”误判成强起。
 
 ---
 

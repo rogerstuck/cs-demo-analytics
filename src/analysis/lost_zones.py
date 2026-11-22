@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -32,6 +31,8 @@ import numpy as np
 import polars as pl
 from awpy.plot import pixel_to_world, radar, world_to_pixel
 
+from .common import load_map_name
+
 RADAR = 1024  # awpy 雷达图为 1024x1024
 
 
@@ -40,11 +41,6 @@ def _safe_stdout() -> None:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except Exception:
         pass
-
-
-def load_map_name(data_dir: Path) -> str:
-    header = json.loads((data_dir / "tables" / "header.json").read_text(encoding="utf-8"))
-    return header["map_name"]
 
 
 def assign_rounds(kills: pl.DataFrame, rounds: pl.DataFrame) -> pl.DataFrame:
@@ -78,6 +74,11 @@ def analyze(data_dir: Path, grid: int = 12, min_samples: int = 2) -> dict:
     map_name = load_map_name(data_dir)
     kills = pl.read_parquet(data_dir / "tables" / "kills.parquet")
     rounds = pl.read_parquet(data_dir / "tables" / "rounds.parquet")
+
+    # bot（steamid == 0）不参与失守区域统计：bot 走位不是人类战术，会污染区域结论
+    kills = kills.filter(
+        (pl.col("attacker_steamid") != 0) & (pl.col("victim_steamid") != 0)
+    )
 
     k = assign_rounds(kills, rounds)
     opening = opening_kills(k)

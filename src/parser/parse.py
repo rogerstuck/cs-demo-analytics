@@ -14,6 +14,7 @@ import json
 import sys
 from pathlib import Path
 
+import polars as pl
 from awpy import Demo
 
 
@@ -25,6 +26,41 @@ def _safe_stdout() -> None:
         pass
 
 
+def annotate_players(players: pl.DataFrame) -> tuple[pl.DataFrame, dict]:
+    """标注 bot 与观战者实体。
+
+    CS2 中 **bot 的 steamid 为 0**，GOTV 观战者实体（如 ``5EGOTV``）同样为 0，
+    二者必须区分开，否则观战者会被误当成玩家。判定规则：
+
+    - 观战者：steamid == 0 且（名字含 ``GOTV`` 或 side 为空）
+    - bot：steamid == 0 且不是观战者
+
+    Returns:
+        (标注后的 players 表, bot 信息字典)
+    """
+    is_sid0 = pl.col("steamid") == 0
+    name_up = pl.col("name").str.to_uppercase().fill_null("")
+    is_spectator = is_sid0 & (name_up.str.contains("GOTV") | pl.col("side").is_null())
+
+    df = players.with_columns(
+        is_spectator.alias("is_spectator"),
+        (is_sid0 & ~is_spectator).alias("is_bot"),
+    )
+
+    info = {
+        "bot_steamids": sorted(df.filter(pl.col("is_bot"))["steamid"].unique().to_list()),
+        "bot_names": sorted(df.filter(pl.col("is_bot"))["name"].unique().to_list()),
+        "spectator_names": sorted(
+            df.filter(pl.col("is_spectator"))["name"].unique().to_list()
+        ),
+        "note": (
+            "CS2 中 bot 的 steamid 为 0，GOTV 观战者实体同样为 0。"
+            "分析模块默认剔除 steamid == 0 的数据（即 bot 与观战者）。"
+        ),
+    }
+    return df, info
+
+
 def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: float = 1.0) -> dict:
     """解析单个 demo，写出 Parquet 文件，返回汇总信息。"""
     demo_path = Path(demo_path).resolve()
@@ -33,7 +69,7 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
 
     print(f"[1/3] 解析 demo：{demo_path.name}")
     demo = Demo(str(demo_path))
-    demo.load("kills", "damages", "shots")
+    demo.load("kills", "damages", "shots", "item_events")
 
     match_id = demo_path.stem
     out = Path(out_dir) / match_id
@@ -46,9 +82,17 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
         json.dumps(demo.header, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
+    # players 表加上 bot / 观战者标记
+    players, bot_info = annotate_players(demo.players)
+    (tables_dir / "bots.json").write_text(
+        json.dumps(bot_info, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    if bot_info["bot_names"]:
+        print(f"      检测到 bot：{', '.join(bot_info['bot_names'])}（steamid=0，分析时默认剔除）")
+
     # 各数据集落库（Parquet 天然 UTF-8，中文名安全）
     tables: dict[str, object] = {
-        "players": demo.players,
+        "players": players,
         "stats": demo.stats,
         "rounds": demo.rounds,
         "kills": demo.kills,
@@ -57,6 +101,7 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
         "round_economy": demo.round_economy,
         "grenades": demo.grenades,
         "bomb": demo.bomb,
+        "item_events": demo.item_events,
         "snapshots_1s": demo.snapshots(seconds=snapshot_seconds),
     }
 
@@ -76,6 +121,7 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
         "match_id": match_id,
         "output_dir": str(out),
         "tables": manifest,
+        "bots": bot_info["bot_names"],
     }
     return summary
 

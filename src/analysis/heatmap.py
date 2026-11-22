@@ -20,7 +20,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -31,6 +30,8 @@ matplotlib.use("Agg")  # 无界面后端，便于命令行保存图片
 import polars as pl
 from awpy.plot import heatmap as draw_heatmap
 
+from .common import drop_bots, load_map_name
+
 _SIDE_MAP = {
     "t": "terrorist",
     "terrorist": "terrorist",
@@ -38,12 +39,6 @@ _SIDE_MAP = {
     "counter-terrorist": "counter-terrorist",
     "counter_terrorist": "counter-terrorist",
 }
-
-
-def load_map_name(data_dir: Path) -> str:
-    """从 header.json 读取地图名。"""
-    header = json.loads((data_dir / "tables" / "header.json").read_text(encoding="utf-8"))
-    return header["map_name"]
 
 
 def load_points(
@@ -54,17 +49,22 @@ def load_points(
     player: str | None = None,
     role: str | None = None,
 ) -> list[tuple[float, float]]:
-    """从指定表读取 (x, y) 坐标点，支持阵营/玩家过滤。"""
+    """从指定表读取 (x, y) 坐标点，支持阵营/玩家过滤。
+
+    bot 与观战者（steamid == 0）默认剔除。
+    """
     df = pl.read_parquet(data_dir / "tables" / f"{table}.parquet")
 
     if table == "snapshots_1s":
         x_col, y_col = "x", "y"
         side_col, name_col = "side", "name"
+        df = drop_bots(df)
     elif table == "kills":
         if role not in ("attacker", "victim"):
             raise ValueError("table=kills 时必须指定 --role attacker 或 victim")
         x_col, y_col = f"{role}_x", f"{role}_y"
         side_col, name_col = f"{role}_side", f"{role}_name"
+        df = df.filter(pl.col(f"{role}_steamid") != 0)
     else:
         raise ValueError(f"暂不支持的表：{table}（可选 snapshots_1s / kills）")
 
