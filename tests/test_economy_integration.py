@@ -1,7 +1,7 @@
 # 经济分类端到端测试：用合成的表格目录验证 build_round_economy 的完整链路
 #
 # 单元测试（test_economy.py）只覆盖 classify() 纯函数；这里造一份最小的
-# tables/ 目录（snapshots_1s / rounds / item_events / round_economy），
+# tables/ 目录（snapshots_1s / rounds / item_events），
 # 真正跑一遍读表 → freeze 末快照 → 购买汇总 → 分类 → 输出。
 #
 # 合成回合设计（以 CT 方视角；R6 为换边后的手枪局，双方阵营互换）：
@@ -64,7 +64,7 @@ def _make_tables_dir(tmp_path) -> "object":
         json.dumps({"map_name": "de_dust2"}, ensure_ascii=False), encoding="utf-8"
     )
 
-    rounds, snapshot_rows, purchase_rows, eco_rows = [], [], [], []
+    rounds, snapshot_rows, purchase_rows = [], [], []
 
     for idx, (rn, *_) in enumerate(CT_PROFILE):
         start = 1000 * (idx + 1)
@@ -116,15 +116,6 @@ def _make_tables_dir(tmp_path) -> "object":
                             "cost": int(spend_p),
                         }
                     )
-            eco_rows.append(
-                {
-                    "round_num": rn,
-                    "side": side,
-                    "equipment_value": eq * 5,
-                    "buy_type": "placeholder",
-                    "n_players": 5,
-                }
-            )
 
     # bot 与观战者：必须被剔除，不能影响任何统计
     snapshot_rows.append(
@@ -157,7 +148,6 @@ def _make_tables_dir(tmp_path) -> "object":
     pl.DataFrame(rounds).write_parquet(tables / "rounds.parquet")
     pl.DataFrame(snapshot_rows).write_parquet(tables / "snapshots_1s.parquet")
     pl.DataFrame(purchase_rows).write_parquet(tables / "item_events.parquet")
-    pl.DataFrame(eco_rows).write_parquet(tables / "round_economy.parquet")
 
     return data_dir
 

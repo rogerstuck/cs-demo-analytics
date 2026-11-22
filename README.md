@@ -152,9 +152,10 @@ python -m src.analysis.economy --data data/processed/<demo名> --show  # 打印�
 
 输出：`tables/round_economy_v2.parquet`、`reports/round_economy_v2.csv`
 
-分类规则（eco / force / full，手枪局单独成类）见 `docs/数据字典.md` 第 6 节。
-与 awpy 自带的 `buy_type` 相比，本项目额外考虑了 **可用资金**（人均实际花费）
-和 **对手装备强弱**，避免把“赢手枪局后第二回合买满”误判成强起。
+分类规则（eco / force / full，手枪局单独成类）见 `docs/数据字典.md` 3.12 节。
+本项目**不使用 awpy 自带的 `round_economy.buy_type`**（它只看全队装备总价值的绝对阈值），
+而是额外考虑 **可用资金**（人均实际花费）和 **对手装备强弱**，
+避免把“赢手枪局后第二回合买满”误判成强起。
 
 ---
 

@@ -98,7 +98,6 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
         "kills": demo.kills,
         "damages": demo.damages,
         "shots": demo.shots,
-        "round_economy": demo.round_economy,
         "grenades": demo.grenades,
         "bomb": demo.bomb,
         "item_events": demo.item_events,

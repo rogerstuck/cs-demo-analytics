@@ -2,8 +2,9 @@
 
 为什么不用 awpy 的 ``round_economy.buy_type``
 ------------------------------------------------
-awpy 只按 **全队装备总价值** 做绝对阈值切档（<5000 eco、5000~20000 force、
->=20000 full），不看两件关键事实：
+awpy 有一个现成的 ``round_economy`` 表（我们在 ``parse.py`` 里**不再产出**它，
+以免两套分类混用），它的 ``buy_type`` 只按 **全队装备总价值** 做绝对阈值切档
+（``<5000`` eco、``5000~20000`` force、``>=20000`` full），不看两件关键事实：
 
 1. **可用资金**——赢了手枪局第二回合人均 3500 全花光，已是经济上限，
    这叫"买满/反 eco 买"，不是强起；
@@ -46,7 +47,6 @@ import polars as pl
 
 from .common import (
     RIFLES,
-    SIDE_SHORT,
     freeze_end_snapshot,
     load_map_name,
     load_table,
@@ -205,20 +205,11 @@ def build_round_economy(data_dir: str | Path, rules: dict[str, float] | None = N
         pl.Series("eco_kind", kinds, dtype=pl.String),
     ).with_columns(saved_gear=(pl.col("eco_kind") == "eco_gear").fill_null(False))
 
-    # 与 awpy 原分类对照
-    awpy = load_table(data_dir, "round_economy", exclude_bots=False).select(
-        ["round_num", "side", "buy_type"]
-    )
-    df = df.join(awpy, on=["round_num", "side"], how="left").rename(
-        {"buy_type": "awpy_buy_type"}
-    )
-
     cols = [
         "round_num",
         "side",
         "n_players",
         "buy_type_v2",
-        "awpy_buy_type",
         "eco_kind",
         "saved_gear",
         "eq_p",
@@ -246,17 +237,6 @@ def summarize(df: pl.DataFrame) -> str:
     for row in dist.iter_rows(named=True):
         lines.append(
             f"  {row['buy_type_v2']:<8} {row['行数']:>3} 行   人均装备 {row['人均装备']:>6}"
-        )
-
-    diff = df.filter(pl.col("buy_type_v2") != pl.col("awpy_buy_type"))
-    lines.append(f"\n== 与 awpy 分类不一致：{diff.height} 行 ==")
-    for row in diff.iter_rows(named=True):
-        lines.append(
-            f"  第 {row['round_num']:>2} 回合 {SIDE_SHORT.get(row['side'], row['side']):<2}"
-            f" awpy={row['awpy_buy_type']:<6} → {row['buy_type_v2']:<6}"
-            f" 人均装备 {row['eq_p']:>5.0f} / 对手 {row['eq_opp']:>5.0f}"
-            f"（比例 {row['eq_ratio']:.2f}）长枪 {row['n_rifle']} 把"
-            f"，花费 {row['spend_p']:>5.0f}"
         )
     return "\n".join(lines)
 
