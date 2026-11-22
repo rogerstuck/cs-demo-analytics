@@ -23,7 +23,7 @@ awpy 只按 **全队装备总价值** 做绝对阈值切档（<5000 eco、5000~2
 
 判定顺序（手枪局单独成类，不参与经济分类）::
 
-    pistol : 半场首回合（全员只剩免费手枪，没得选买什么）
+    pistol : 半场首回合（靠换边检测，见 common.pistol_round_numbers）
     eco    : spend_p < 500                  —— 没投入：攒钱 / 保枪
     full   : eq_p >= 4000 且 n_rifle >= 3   —— 绝对达标：多数人有长枪
     full   : eq_p >= 3000 且 eq_p >= 0.85*eq_opp  —— 相对不亏：对得起这回合
@@ -50,6 +50,7 @@ from .common import (
     freeze_end_snapshot,
     load_map_name,
     load_table,
+    pistol_round_numbers,
     safe_stdout,
 )
 
@@ -66,7 +67,7 @@ BUY_RULES: dict[str, float] = {
     "full_rel_eq_min": 3000,
 }
 
-PISTOL_EQ_START_MAX = 200  # 半场首回合：全员只剩免费手枪（200）
+PISTOL_EQ_START_MAX = 200  # 仅供参考：手枪局全员带入装备仅剩免费手枪
 
 
 def classify(
@@ -100,10 +101,11 @@ def eco_kind(*, spend_p: float, n_rifle: int, rules: dict[str, float] | None = N
 
 
 def is_pistol_round(g: pl.DataFrame) -> bool:
-    """半场首回合判定：全员带入装备值只剩免费手枪（<=200）。"""
-    if "equipment_value_round_start" not in g.columns or g.height == 0:
-        return False
-    return bool(g["equipment_value_round_start"].max() <= PISTOL_EQ_START_MAX)
+    """已弃用：纯 eco 局（没人带枪）与手枪局的带入装备值无法区分。
+
+    请用 :func:`src.analysis.common.pistol_round_numbers`（换边检测）。
+    """
+    raise NotImplementedError("改用 common.pistol_round_numbers()（换边检测）")
 
 
 def build_round_economy(data_dir: str | Path, rules: dict[str, float] | None = None) -> pl.DataFrame:
@@ -114,6 +116,7 @@ def build_round_economy(data_dir: str | Path, rules: dict[str, float] | None = N
     items = load_table(data_dir, "item_events")  # 已剔除 bot（bot 购买不计）
 
     freeze = freeze_end_snapshot(snapshots, rounds)
+    pistol_rounds = set(pistol_round_numbers(snapshots, rounds))
 
     # 每回合每方的基础画像
     rows: list[dict] = []
@@ -122,7 +125,7 @@ def build_round_economy(data_dir: str | Path, rules: dict[str, float] | None = N
         if r.height == 0:
             continue
         r0 = r.row(0, named=True)
-        pistol = is_pistol_round(grp)
+        pistol = int(round_num) in pistol_rounds
 
         buys = items.filter(
             (pl.col("action") == "purchase")

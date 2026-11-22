@@ -92,3 +92,56 @@ def freeze_end_snapshot(snapshots: pl.DataFrame, rounds: pl.DataFrame) -> pl.Dat
             pl.lit(None, dtype=pl.Int32).alias("round_num")
         )
     return pl.concat(picks, how="vertical_relaxed")
+
+
+def assign_round_numbers(
+    df: pl.DataFrame, rounds: pl.DataFrame, *, tick_col: str = "tick"
+) -> pl.DataFrame:
+    """按 tick 把事件/快照归到所属回合（新增 ``round_num`` 列）。"""
+    r = rounds.sort("start_tick").select(["round_num", "start_tick"])
+    return (
+        df.sort(tick_col)
+        .join_asof(r, left_on=tick_col, right_on="start_tick", strategy="backward")
+        .filter(pl.col(tick_col) <= rounds["end_tick"].max())
+    )
+
+
+def pistol_round_numbers(snapshots: pl.DataFrame, rounds: pl.DataFrame) -> list[int]:
+    """判定哪些回合是手枪局（= 每个半场的第一回合）。
+
+    判据：demo 第一回合 + **出现大规模换边的回合**。
+
+    Note:
+        不能用"全员带入装备值只剩免费手枪（<=200）"来判定：**纯 eco 局**
+        （上回合没人带枪回来）同样满足这个条件，会被误判成手枪局。
+        而换边（双方阵营互换）是半场开始的唯一可靠信号。
+    """
+    order = rounds.sort("start_tick")["round_num"].to_list()
+    if not order:
+        return []
+
+    snap = assign_round_numbers(
+        snapshots.select(["tick", "steamid", "side"]), rounds
+    ).filter(pl.col("steamid") != 0)
+    if snap.height == 0:
+        return [int(order[0])]
+
+    sides: dict[int, dict[int, str]] = {}
+    for (rn,), g in snap.group_by(["round_num"], maintain_order=True):
+        if rn is None:
+            continue
+        first = g.group_by("steamid").agg(pl.col("side").first())
+        sides[int(rn)] = dict(zip(first["steamid"].to_list(), first["side"].to_list()))
+
+    pistols = {int(order[0])}
+    prev = sides.get(int(order[0]), {})
+    for rn in order[1:]:
+        cur = sides.get(int(rn), {})
+        common = set(prev) & set(cur)
+        if common:
+            flipped = sum(1 for sid in common if prev[sid] != cur[sid])
+            if flipped > len(common) / 2:
+                pistols.add(int(rn))
+        if cur:
+            prev = cur
+    return sorted(pistols)

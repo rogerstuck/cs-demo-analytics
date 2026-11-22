@@ -4,7 +4,8 @@
 
 import pytest
 
-from src.analysis.economy import BUY_RULES, classify, eco_kind, is_pistol_round
+from src.analysis.common import pistol_round_numbers
+from src.analysis.economy import BUY_RULES, classify, eco_kind
 
 
 def _cls(spend_p, eq_p, n_rifle, eq_opp, is_pistol=False):
@@ -84,11 +85,30 @@ def test_rules_are_overridable(custom):
     assert got == "full"
 
 
-def test_is_pistol_round_detects_empty_loadout():
-    """半场首回合：全员带入装备值只剩免费手枪（<=200）。"""
+def test_pistol_rounds_detected_by_side_flip_not_by_loadout():
+    """手枪局靠**换边**判定，不靠"带入装备只剩免费手枪"。
+
+    纯 eco 局（没人带枪回来）带入装备与手枪局一模一样，必须能区分。
+    """
     import polars as pl
 
-    pistol = pl.DataFrame({"equipment_value_round_start": [200, 200, 200, 200, 200]})
-    normal = pl.DataFrame({"equipment_value_round_start": [200, 850, 2750, 4050, 4300]})
-    assert is_pistol_round(pistol) is True
-    assert is_pistol_round(normal) is False
+    rounds = pl.DataFrame(
+        {
+            "round_num": [1, 2, 3, 4],
+            "start_tick": [100, 200, 300, 400],
+            "end_tick": [190, 290, 390, 490],
+        }
+    )
+    rows = []
+    for rn, start in [(1, 100), (2, 200), (3, 300), (4, 400)]:
+        for sid in (11, 12):
+            # 第 1~2 回合 sid 11/12 在 CT；第 3 回合起换边到 T
+            side = "counter-terrorist" if rn <= 2 else "terrorist"
+            rows.append({"tick": start + 10, "steamid": sid, "side": side})
+        for sid in (21, 22):
+            side = "terrorist" if rn <= 2 else "counter-terrorist"
+            rows.append({"tick": start + 10, "steamid": sid, "side": side})
+    snapshots = pl.DataFrame(rows)
+
+    # 第 1 回合（首回合）与第 3 回合（换边）是手枪局，其他不是
+    assert pistol_round_numbers(snapshots, rounds) == [1, 3]
