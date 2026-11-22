@@ -217,6 +217,10 @@ python -m src.analysis.economy --data data/processed/<demo名> --show  # 打印�
 
 - 推荐系统无法在线验证，离线评估只能证明"与历史高胜率站位的一致性"
 - awpy 3.x 仅支持 CS2（Source 2），不支持 CS:GO（Source 1）
+- 第三方平台（5E / 完美 / Faceit）会在 demo 的武器字符串里带**涂装/名牌前缀**
+  （如 `5e_2023pass1_ak47`）。解析时已自动产出 `weapon_clean` 规范化列，
+  **统计时请用 `weapon_clean` 而不是 `weapon`**（详见 `docs/数据字典.md`）
+- bot（玩家掉线后的 AI 补位）的购买花费不可信，所有经济统计默认剔除 `steamid == 0`
 
 ---
 

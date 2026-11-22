@@ -17,6 +17,93 @@ from pathlib import Path
 import polars as pl
 from awpy import Demo
 
+# 非枪械/无法从快照推导的武器名（规整后保留，不做剔除）
+EXTRA_WEAPON_NAMES: frozenset[str] = frozenset(
+    {
+        "world",  # 非玩家武器造成的死亡（坠亡/环境伤害）
+        "knife",
+        "knife_t",
+        "knife_ct",
+        "taser",
+        "c4",
+        "planted_c4",
+        "hegrenade",
+        "flashbang",
+        "smokegrenade",
+        "molotov",
+        "incgrenade",
+        "decoy",
+        "inferno",
+        "snowball",
+        "shield",
+    }
+)
+
+
+def canonical_weapon_names(snapshots: pl.DataFrame) -> set[str]:
+    """汇总本 demo 里出现过的规范武器名。
+
+    快照里的 ``primary_weapon`` / ``secondary_weapon`` 取自武器实体 → 物品定义
+    索引，是**规范类名**（如 ``m4a1_silencer``），不会带涂装/名牌前缀。
+    再补上投掷物、刀、``world`` 等非快照武器。
+    """
+    known: set[str] = set(EXTRA_WEAPON_NAMES)
+    for col in ("primary_weapon", "secondary_weapon"):
+        if col not in snapshots.columns:
+            continue
+        for v in snapshots[col].drop_nulls().unique().to_list():
+            s = str(v).strip().lower()
+            if s.startswith("weapon_"):
+                s = s[len("weapon_") :]
+            if s:
+                known.add(s)
+    return known
+
+
+def normalize_weapon(raw: str | None, known: set[str]) -> str | None:
+    """把原始武器字符串规整成规范类名。
+
+    demo 的 ``player_death`` 等事件里，武器的字符串可能带上**涂装 / 名牌前缀**，
+    例如同一把 M4A1-S 会出现两种写法：
+
+    - ``m4a1_silencer``              （普通武器）
+    - ``5e_2023pass1_m4a1_silencer`` （带 5E 平台 2023 赛季涂装前缀）
+
+    这不是两种枪，只是服务器把外观名写进了事件字符串。本函数用**最长后缀匹配**
+    把它还原成规范名，所以对任意平台前缀（5E / 完美 / Faceit …）都适用。
+
+    Args:
+        raw: 原始武器字符串（如 ``5e_2023pass1_ak47`` / ``weapon_ak47``）
+        known: 规范武器名集合（见 :func:`canonical_weapon_names`）
+
+    Returns:
+        规范武器名；无法匹配时返回去掉 ``weapon_`` 前缀的小写原值。
+    """
+    if raw is None:
+        return None
+    s = str(raw).strip().lower()
+    if not s:
+        return s
+    if s.startswith("weapon_"):
+        s = s[len("weapon_") :]
+    if s in known:
+        return s
+    parts = s.split("_")
+    # 从最长的后缀开始尝试（i 越小后缀越长）
+    for i in range(1, len(parts)):
+        cand = "_".join(parts[i:])
+        if cand in known:
+            return cand
+    return s
+
+
+def add_weapon_clean(df: pl.DataFrame, known: set[str]) -> pl.DataFrame:
+    """给表添加 ``weapon_clean`` 列（与 ``weapon`` 并列，原列不动）。"""
+    if "weapon" not in df.columns:
+        return df
+    cleaned = [normalize_weapon(w, known) for w in df["weapon"].to_list()]
+    return df.with_columns(pl.Series("weapon_clean", cleaned, dtype=pl.String))
+
 
 def _safe_stdout() -> None:
     """让 Windows 控制台按 UTF-8 输出，避免中文乱码。"""
@@ -90,18 +177,21 @@ def parse_demo(demo_path: str | Path, out_dir: str | Path, snapshot_seconds: flo
     if bot_info["bot_names"]:
         print(f"      检测到 bot：{', '.join(bot_info['bot_names'])}（steamid=0，分析时默认剔除）")
 
+    snapshots = demo.snapshots(seconds=snapshot_seconds)
+    known_weapons = canonical_weapon_names(snapshots)
+
     # 各数据集落库（Parquet 天然 UTF-8，中文名安全）
     tables: dict[str, object] = {
         "players": players,
         "stats": demo.stats,
         "rounds": demo.rounds,
-        "kills": demo.kills,
-        "damages": demo.damages,
-        "shots": demo.shots,
+        "kills": add_weapon_clean(demo.kills, known_weapons),
+        "damages": add_weapon_clean(demo.damages, known_weapons),
+        "shots": add_weapon_clean(demo.shots, known_weapons),
         "grenades": demo.grenades,
         "bomb": demo.bomb,
         "item_events": demo.item_events,
-        "snapshots_1s": demo.snapshots(seconds=snapshot_seconds),
+        "snapshots_1s": snapshots,
     }
 
     manifest: dict[str, dict] = {}
